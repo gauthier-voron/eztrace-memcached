@@ -1,0 +1,105 @@
+#!/usr/bin/perl -l
+
+use lib qw(. ./script);
+use strict;
+use warnings;
+
+use Data qw(:csv :math :log);
+
+
+sub main
+{
+    my ($input, $mkey, $output) = @_;
+    my ($data, $metric, $config, $key, $val, $throughputs);
+    my (%keyset, @configs, %cscores, @sortedkeys);
+
+    loadcsv($input, sub {
+	my ($thread, $concur, $rprop, $key, $value, $throughput) = @_;
+	my (@pre, $cur, $curname, @post, @names);
+	my ($invar);
+
+	return if ($. == 1);
+
+	($curname, @names) = ('thread', 'concur', 'rprop', 'key', 'value');
+	($cur, @post) = ($thread, $concur, $rprop, $key, $value);
+	while (@post) {
+	    $invar = join(',', @pre, @post);
+	    
+	    $data->{$curname}->{$invar}->{$cur} = $throughput;
+	    
+	    push(@pre, $cur);
+	    $cur = shift(@post);
+	    $curname = shift(@names);
+	}
+    });
+
+    foreach $metric (keys(%$data)) {
+	%keyset = ();
+	@configs = sort { $a cmp $b } keys(%{$data->{$metric}});
+	%cscores = map { $_, 0 } @configs;
+	@sortedkeys = ();
+	
+	foreach $config (@configs) {
+	    $throughputs = $data->{$metric}->{$config};
+	    if (scalar(keys(%$throughputs)) == 1) {
+		next;
+	    }
+	    
+	    foreach $key (keys(%$throughputs)) {
+		$keyset{$key} = 1;
+		$cscores{$config} += 1;
+	    }
+	}
+
+	if (scalar(keys(%keyset)) == 0) {
+	    next;
+	}
+	
+	if (defined($mkey)) {
+	    if ($mkey ne $metric) {
+		next;
+	    }
+	    if (!open(STDOUT, '>', $output)) {
+		errorp("cannot write in '$output'");
+	    }
+	} else {
+	    printf("%s\n", $metric);
+	    next;
+	}
+
+	@configs = grep { $cscores{$_} > 1 } @configs;
+	printf("#%s %s\n", $metric, join(' ', @configs));
+
+	if (grep { $metric eq $_ } qw(key value)) {
+	    @sortedkeys = sort {
+		my ($fa, $fb) = ($a, $b);
+		$fa =~ s/^(\d+).*/$1/;
+		$fb =~ s/^(\d+).*/$1/;
+		$fa <=> $fb
+	    } keys(%keyset)
+	} else {
+	    @sortedkeys = sort { $a <=> $b } keys(%keyset)
+	}
+	
+	foreach $key (@sortedkeys) {
+	    printf("%s", $key);
+
+	    foreach $config (@configs) {
+		$val = $data->{$metric}->{$config}->{$key};
+		if (defined($val)) {
+		    printf(" %s", $val);
+		} else {
+		    printf(" -");
+		}
+	    }
+
+	    printf("\n");
+	}
+
+	close(STDOUT);
+    }
+
+    return 0;
+}
+
+exit (main(@ARGV));

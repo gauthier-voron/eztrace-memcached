@@ -1,0 +1,49 @@
+#!/usr/bin/perl -l
+
+use lib qw(. ./script);
+use strict;
+use warnings;
+
+use Data qw(:plot :log);
+
+
+sub main
+{
+    my ($input, $output) = @_;
+    my ($gnucode, $fh, @configs, $line);
+    my ($num, $prefix, $config);
+
+    if (!open($fh, '<', $input)) {
+	errorp("cannot read from '$input'");
+    } else {
+	chomp($line = <$fh>);
+	@configs = split(' ', $line);
+	shift(@configs);
+	close($fh);
+    }
+
+    if (defined($output) && !open(STDOUT, '>', $output)) {
+	errorp("cannot write in '$output'");
+    }
+
+    $gnucode = graph();
+    $gnucode .= <<"EOF";
+set terminal pdfcairo size 5,5;
+set key outside top center font ',8';
+EOF
+
+    $num = 2;
+    $prefix = "plot '$input' using $num:xtic(1)";
+    foreach $config (@configs) {
+	$gnucode .= $prefix . " title '$config' with linespoints";
+	$num += 1;
+	$prefix = ",\n    '' using $num:xtic(1)";
+    }
+    $gnucode .= ";\n";
+
+    gnuplot($gnucode);
+    
+    return 0;
+}
+
+exit (main(@ARGV));

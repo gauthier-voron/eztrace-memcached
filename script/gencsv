@@ -1,0 +1,72 @@
+#!/usr/bin/perl -l
+
+use strict;
+use warnings;
+
+
+sub main
+{
+    my (@inputs) = @_;
+    my ($output) = pop(@inputs);
+    my ($input, $fh, $line);
+    my ($threads, $concur, $get_prop, $key_size, $value_size, $throughput);
+
+    if (!open(STDOUT, '>', $output)) {
+	printf(STDERR "cannot open output '%s' : %s\n", $output, $!);
+	return 1;
+    }
+
+    printf("threads count,concurrency,get_prop,key_size,"
+	   . "value_size,throughout\n");
+
+    foreach $input (@inputs) {
+	if (!open($fh, '<', $input . '/stdout.log')) {
+	    printf(STDERR "cannot open input '%s' : %s\n",
+		   $input . '/stdout.log', $!);
+	    next;
+	}
+
+	while (defined($line = <$fh>)) {
+	    chomp($line);
+
+	    if ($line =~ /^threads count: (\d+)$/) {
+		$threads = $1;
+	    } elsif ($line =~ /^concurrency: (\d+)$/) {
+		$concur = $1;
+	    } elsif ($line =~ /^get proportion: get_prop=(\S+)$/) {
+		$get_prop = $1;
+	    } elsif ($line =~ /^Run time:.*TPS: (\d+) Net.*$/) {
+		$throughput = $1;
+	    }
+	}
+
+	close($fh);
+
+
+	if (!open($fh, '<', $input . '/command.sh')) {
+	    printf(STDERR "cannot open input '%s' : %s\n",
+		   $input . '/command.sh', $!);
+	    next;
+	}
+
+	while (defined($line = <$fh>)) {
+	    chomp($line);
+
+	    if ($line =~ m|memaslap.d/memalsap_(\d+-\d+)_(\d+-\d+)_|) {
+		$key_size = $1;
+		$value_size = $2;
+		last;
+	    }
+	}	
+
+	close($fh);
+
+
+	printf("%d,%d,%s,%s,%s,%d\n", $threads, $concur, $get_prop, $key_size,
+	       $value_size, $throughput);
+    }
+
+    return 0;
+}
+
+exit (main(@ARGV));

@@ -1,0 +1,70 @@
+throughput-rprop.pdf:
+  - Pas de dégradation obervée
+
+  - On distingue nettement 3 groupes
+    - groupe 1: threads=8, concurrency=512, value_size=4096-65535
+      => meilleur throughput
+    - groupe 2: threads=8, concurrency=512, value_size=256-4095
+                threads=8, concurrency=512, value_size=8-255
+                threads=32, concurrency=512
+      => throughput entre 1.5 et 2 fois moins élevé que le 1er groupe
+    - groupe 3: le reste
+      => throughput quasi-nul
+
+  - Le throughput augmente fortement avec la diminution du nombre d'écriture.
+    Quand le nombre d'écriture est important, les 3 groupes sont confondus.
+
+  => Le nombre d'écriture est probablement un facteur de contention
+  => Les paramètres threads=8, concurrency=512 et value_size=4096 permettent
+     de scaler quand le nombre d'écriture est faible.
+
+
+throughput-thread.pdf:
+  - Dégradation observée sur 2 points
+
+  - On distigue 2 groupes
+    - groupe 1: concurrency=512, read_prop=1
+      => le throughput varie (diminue) avec l'augmentation du nombre de threads
+    - groupe 2: le reste
+      => le throughput reste quasi-nul quelque soit le nombre de thread
+
+  - Dans le groupe 1, le throughput est dégradé quand le nombre de thread
+    augmente.
+    - Si la taille de la clef est 16-31, la dégradation est faible
+    - Si la taille de la clef est 32-63, la dégradation est très forte
+
+  => Le nombre de thread est probablement un facteur de contention
+  => Cette contention n'est pas visible si la concurrency n'est pas 512 et
+     la proportion de lecture 1.0 (confirme throughput-rprop.pdf)
+  => La taille de la clef influe sur les effets de la contention : plus la
+     clef est grande, plus la contention est visible
+
+
+throughput-key.pdf:
+  - Dégradation observée sur 2 points
+
+  - On distingue 3 groupes
+    - groupe 1: threads=8, concurrency=512, read_prop=1
+      => le throughput est élevé est varie peu avec la taille des clefs
+    - groupe 2: threads=32, concurency=512, read_prop=1
+      => le throughput est élevé avec de petites clefs mais chute quand la
+         taille des clefs augmente
+    - groupe 3: le reste
+      => le throughput est quasi-nul
+
+  - Dans le groupe 1, le throughput dépend le la taille des valeurs
+
+  => Le groupe 2 équivaut à l'analyse de throughput-threads.pdf
+  => Quand le nombre de threads est faible, la taille des clefs importe peu
+  => Quand le nombre de threads est élevé, la taille des clefs importe
+  => La taille des valeurs semble se traduire par une constante dans le
+     throughput
+
+
+Conclusions:
+  - Le paramètre threads est un bon candidat pour observer une dégradation
+  - Le paramètre concurrency devrait être positionné à 512
+  - Le paramètre read_prop devrait être positionné à 1
+  - Le paramètre key_size est un bon candidat pour observer une dégradation
+  - La paramètre value_size est peu important, mais devrait être positionné
+    à une valeur haute pour augmenter les effets d'une contention
